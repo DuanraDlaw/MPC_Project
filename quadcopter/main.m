@@ -14,14 +14,16 @@ disp('Data successfully loaded')
 N = 10;
 T = 2;
 
-x0 = [-1 10 -10 120*pi/180 0 0 0]';
+x0 = [-1 10*pi/180 -10*pi/180 120*pi/180 0 0 0]';
 
 Q = eye(7);
 R = eye(4);
 
 zpMax = 1;                  % [m/s]
 alphaMax = 10*pi/180;       % [rad]
+angleMax = [alphaMax; alphadMax];
 alphadMax = 15*pi/180;      % [rad/s]
+angledMax = [alphadMax; alphadMax];
 gammadMax = 60*pi/180;      % [rad/s]
 
 x = sdpvar(7,N+1,'full');
@@ -37,8 +39,8 @@ constraints = constraints + (x(:,1) == x0);
 
 for i = 1:N
     constraints = constraints + (-zpMax <= x(1,i+1) <= zpMax);
-    constraints = constraints + (-alphaMax <= x(2:3,i+1) <= alphaMax);
-    constraints = constraints + (-alphadMax <= x(4:5,i+1) <= alphadMax);
+    constraints = constraints + (-angleMax <= x(2:3,i+1) <= angleMax);
+    constraints = constraints + (-angledMax <= x(4:5,i+1) <= angledMax);
     constraints = constraints + (-gammadMax <= x(6,i+1) <= gammadMax);
     
     constraints = constraints + (0 <= u(:,i) <= 1);
