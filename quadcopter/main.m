@@ -27,6 +27,8 @@ gammadMax = 60*pi/180;      % [rad/s]
 x = sdpvar(7,N+1,'full');
 u = sdpvar(4,N,'full');
 
+[~,S,~] = dlqr(sys.A, sys.B, Q, R, zeros(7, 4));
+
 constraints = [];
 for i = 1:N
     constraints = constraints + (x(:,i+1) == sys.A*x(:,i) + sys.B*u(:,i));
@@ -46,10 +48,11 @@ objective = 0;
 for i = 1:N
     objective = objective +  x(:,i)'*Q*x(:,i) + u(:,i)'*R*u(:,i);
 end 
+objective = objective + x(:,N+1)'*S*x(:,N+1);
 
 options = sdpsettings('solver','qpip');
 innerController = optimizer(constraints, objective, options, x(:,1), u(:,1));
-simQuad( sys, innerController, x0, T);
+simQuad(sys, innerController, x0, T);
 
 %%
 pause
