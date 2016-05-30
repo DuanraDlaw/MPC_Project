@@ -44,10 +44,10 @@ for i = 1:N-1
     constraints = constraints + (x(:,i+1) == sys.A*x(:,i) + sys.B*u(:,i));
    
     % State constraints
-    constraints = constraints + (-zpMax <= x(1,i+1) <= zpMax);
-    constraints = constraints + (-angleMax <= x(2:3,i+1) <= angleMax);
-    constraints = constraints + (-angledMax <= x(5:6,i+1) <= angledMax);
-    constraints = constraints + (-gammadMax <= x(7,i+1) <= gammadMax);
+    constraints = constraints + (-zpMax <= x(1,i) <= zpMax);
+    constraints = constraints + (-angleMax <= x(2:3,i) <= angleMax);
+    constraints = constraints + (-angledMax <= x(5:6,i) <= angledMax);
+    constraints = constraints + (-gammadMax <= x(7,i) <= gammadMax);
    
     % Input Constraints
     constraints = constraints + (uMin <= u(:,i) <= uMax);
@@ -67,7 +67,80 @@ simQuad(sys, innerController, x0, T);
 
 %% Reference tracking - no disturbance, no invariant sets
 fprintf('PART II - reference tracking...\n')
+% yalmip('clear');
+close all;
 
+% Define steady-state parameters
+C = [eye(4) zeros(4,3)];
+
+% Define optimization variables
+x_r = sdpvar(7,1,'full');
+u_r = sdpvar(4,1,'full');
+r = sdpvar(4,1,'full');
+
+constraints = []; objective = 0;
+% Steady-state
+constraints = [eye(7)-sys.A -sys.B; C zeros(4,4)]*[x_r; u_r] == [zeros(7,1); r];
+
+% State constraints
+constraints = constraints + (-zpMax <= x_r(1) <= zpMax);
+constraints = constraints + (-angleMax <= x_r(2:3) <= angleMax);
+constraints = constraints + (-angledMax <= x_r(5:6) <= angledMax);
+constraints = constraints + (-gammadMax <= x_r(7) <= gammadMax);
+
+% Input Constraints
+constraints = constraints + (uMin <= u(:,i) <= uMax);
+
+% Objective function
+% objective = x_r'*Q*x_r + u_r'*R*u_r;
+objective = u_r'*R*u_r;
+
+% Compile the matrices
+SS_ctrl = optimizer(constraints, objective, options, r, [x_r; u_r]);
+r = [-1 10*pi/180 -10*pi/180 120*pi/180]';
+state = SS_ctrl{r};
+
+%% --------------------------------------------------------------------------
+% MPC Tracking 
+Nsim = 50; % number of simulation steps
+
+% Define optimization variables
+x = sdpvar(7,1,'full');
+r = sdpvar(4,1,'full');
+dx = sdpvar(7,N,'full');
+du = sdpvar(4,N,'full');
+u_r = zeros(4,1); % u_r is close to 0 for arbitrary references
+x_r = [r; zeros(3,1)];
+
+% Define constraints and objective
+constraints = [];
+objective = 0;
+for i = 1:N-1,
+    constraints = constraints + (dx(:,i) == x - x_r);
+    constraints = constraints + (dx(:,i+1) == sys.A*dx(:,i) + sys.B*du(:,i));   % System dynamics
+    
+    constraints = constraints + (-zpMax - x_r(1) <= dx(1,i) <= zpMax - x_r(1));                    % State constraints
+    constraints = constraints + (-angleMax - x_r(2:3) <= dx(2:3,i) <= angleMax - x_r(2:3));
+    constraints = constraints + (-angledMax - x_r(5:6) <= dx(5:6,i) <= angledMax - x_r(5:6));
+    constraints = constraints + (-gammadMax - x_r(7) <= dx(7,i) <= gammadMax - x_r(7));
+    
+    constraints = constraints + (uMin - u_r <= du(:,i) <= uMax - u_r);                       % Input constraints
+    
+    objective = objective + dx(:,i)'*Q*dx(:,i) + du(:,i)'*R*du(:,i);            % Cost function
+end
+% constraints = constraints + (dx(:,N) == 0);
+objective = objective + dx(:,N)'*S*dx(:,N);     % Terminal constraint
+
+innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1)], du(:,1));
+
+% --- constant reference tracking ---
+zdotr = -0.8;
+rollr = 8/180*pi;
+pitchr = -6/180*pi;
+yawr = 3/180*pi;
+ref = [zdotr rollr pitchr yawr]'/2;
+x0 = zeros(7,1);
+simQuad( sys, innerController, x0, T, ref);
 
 %%
 pause
