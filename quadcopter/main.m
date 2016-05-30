@@ -3,17 +3,22 @@
 %    continuous time matrices Ac,Bc of the linearization
 %    matrices sys.A, sys.B of the inner-loop discretized with sampling period sys.Ts
 %    outer controller optimizer instance
+
+clear;
+close all;
+clc;
+
 load('quadData.mat')
-outerController = getOuterController(Ac, 'cplex');
+outerController = getOuterController(Ac, 'gurobi');
 disp('Data successfully loaded')
 
 %% %%%%%%%%%%%%%% First MPC controller %%%%%%%%%%%%%%%%%%%
 
-% Horizon
+% Horizon steps
 N = 20;
 
 % Parameters for cost function 
-Q = diag([50 1e4 1e4 2 1e-1 1e-1 1e-1]);
+Q = diag([1e4 5e5 5e5 1 1 1 1]);
 R = eye(4);
 
 % Constraints
@@ -62,6 +67,7 @@ simQuad(sys, innerController, x0, T);
 
 %% Reference tracking - no disturbance, no invariant sets
 fprintf('PART II - reference tracking...\n')
+
 
 %%
 pause
