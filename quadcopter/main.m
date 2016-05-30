@@ -102,7 +102,6 @@ state = SS_ctrl{r};
 
 %% --------------------------------------------------------------------------
 % MPC Tracking 
-Nsim = 50; % number of simulation steps
 
 % Define optimization variables
 x = sdpvar(7,1,'full');
@@ -115,30 +114,29 @@ x_r = [r; zeros(3,1)];
 % Define constraints and objective
 constraints = [];
 objective = 0;
+
+% Initial condition
+constraints = constraints + (dx(:,1) == x - x_r);
 for i = 1:N-1,
-    constraints = constraints + (dx(:,i) == x - x_r);
-    constraints = constraints + (dx(:,i+1) == sys.A*dx(:,i) + sys.B*du(:,i));   % System dynamics
-    
-    constraints = constraints + (-zpMax - x_r(1) <= dx(1,i) <= zpMax - x_r(1));                    % State constraints
+    % System dynamics
+    constraints = constraints + (dx(:,i+1) == sys.A*dx(:,i) + sys.B*du(:,i));   
+    % State constraints
+    constraints = constraints + (-zpMax - x_r(1) <= dx(1,i) <= zpMax - x_r(1));                    
     constraints = constraints + (-angleMax - x_r(2:3) <= dx(2:3,i) <= angleMax - x_r(2:3));
     constraints = constraints + (-angledMax - x_r(5:6) <= dx(5:6,i) <= angledMax - x_r(5:6));
     constraints = constraints + (-gammadMax - x_r(7) <= dx(7,i) <= gammadMax - x_r(7));
-    
-    constraints = constraints + (uMin - u_r <= du(:,i) <= uMax - u_r);                       % Input constraints
-    
-    objective = objective + dx(:,i)'*Q*dx(:,i) + du(:,i)'*R*du(:,i);            % Cost function
+    % Input constraints
+    constraints = constraints + (uMin - u_r <= du(:,i) <= uMax - u_r);                       
+    % Cost function
+    objective = objective + dx(:,i)'*Q*dx(:,i) + du(:,i)'*R*du(:,i);            
 end
 % constraints = constraints + (dx(:,N) == 0);
 objective = objective + dx(:,N)'*S*dx(:,N);     % Terminal constraint
 
 innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1)], du(:,1));
 
-% --- constant reference tracking ---
-zdotr = -0.8;
-rollr = 8/180*pi;
-pitchr = -6/180*pi;
-yawr = 3/180*pi;
-ref = [zdotr rollr pitchr yawr]'/2;
+% constant reference signal
+ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';
 x0 = zeros(7,1);
 simQuad( sys, innerController, x0, T, ref);
 
