@@ -135,10 +135,14 @@ objective = objective + dx(:,N)'*S*dx(:,N);     % Terminal constraint
 
 innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1)], du(:,1));
 
-% constant reference signal
+% Constant reference signal
 ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';
 x0 = zeros(7,1);
 simQuad( sys, innerController, x0, T, ref);
+
+% Varying reference signal
+
+
 
 %%
 pause
@@ -152,11 +156,59 @@ pause
 
 %% Disturbance estimation
 %estimator
+% Compute the augmented state matrix
+A_ = [sys.A eye(7); zeros(7) eye(7)];
+B_ = [sys.B; zeros(7,4)];
+C_ = [eye(7) zeros(7)];
+p = [0.5*ones(7,1); 0.45*ones(7,1)];
+K = place(A_', C_', p);
+L = K';
 
+filter.Af = A_ - L*C_;
+filter.Bf = [B_ L];
 
 %% Offset free MPC
 fprintf('PART III - OFFSET FREE / Disturbance rejection...\n')
 
+
+% Define optimization variables
+x = sdpvar(7,1,'full');
+r = sdpvar(4,1,'full');
+dx = sdpvar(7,N,'full');
+du = sdpvar(4,N,'full');
+d = sdpvar(7,1,'full'); % Constant mean of disturbance
+u_r = zeros(4,1); % u_r is close to 0 for arbitrary references
+x_r = [r; zeros(3,1)];
+
+% Define constraints and objective
+constraints = [];
+objective = 0;
+
+% Initial condition
+constraints = constraints + (dx(:,1) == x - x_r);
+for i = 1:N-1,
+    % System dynamics with disturbance
+    constraints = constraints + (dx(:,i+1) + x_r == sys.A*(dx(:,i) + x_r) + sys.B*(du(:,i) + u_r) + d);   
+    % State constraints
+    constraints = constraints + (-zpMax <= dx(1,i) + x_r(1) <= zpMax);                    
+    constraints = constraints + (-angleMax <= dx(2:3,i) + x_r(2:3) <= angleMax);
+    constraints = constraints + (-angledMax <= dx(5:6,i) + x_r(5:6) <= angledMax);
+    constraints = constraints + (-gammadMax <= dx(7,i) + x_r(7) <= gammadMax);
+    % Input constraints
+    constraints = constraints + (uMin <= du(:,i) + u_r <= uMax);                       
+    % Cost function
+    objective = objective + dx(:,i)'*Q*dx(:,i) + du(:,i)'*R*du(:,i);            
+end
+% constraints = constraints + (dx(:,N) == 0);
+objective = objective + dx(:,N)'*S*dx(:,N);     % Terminal constraint
+
+innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1); d], du(:,1));
+
+simQuad(sys, innerController, x0, T, ref, filter);
+
+
+
+%%
 pause
 
 %% Final simulation
