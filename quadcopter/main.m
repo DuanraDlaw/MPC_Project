@@ -15,7 +15,7 @@ disp('Data successfully loaded')
 %% %%%%%%%%%%%%%% First MPC controller %%%%%%%%%%%%%%%%%%%
 
 % Horizon steps
-N = 20;
+N = 10;
 
 % Parameters for cost function 
 Q = diag([1e4 5e5 5e5 1 1 1 1]);
@@ -108,7 +108,7 @@ x = sdpvar(7,1,'full');
 r = sdpvar(4,1,'full');
 dx = sdpvar(7,N,'full');
 du = sdpvar(4,N,'full');
-u_r = zeros(4,1); % u_r is close to 0 for arbitrary references
+u_r = zeros(4,1); % u_r is close to 0 for arbitrary references (previous part)
 x_r = [r; zeros(3,1)];
 
 % Define constraints and objective
@@ -135,13 +135,24 @@ objective = objective + dx(:,N)'*S*dx(:,N);     % Terminal constraint
 
 innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1)], du(:,1));
 
-% Constant reference signal
+%% Tracking of constant reference signal
 ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';
 x0 = zeros(7,1);
 simQuad( sys, innerController, x0, T, ref);
 
-% Varying reference signal
+%% Tracking of slowly varying reference signal
 
+T = 20;
+ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';
+coefs = linspace(0.5, 1, T/sys.Ts+1);
+c_ref = repmat(ref,1, T/sys.Ts+1);
+var_ref = zeros(4, T/sys.Ts+1);
+for i=1:T/sys.Ts+1,
+    var_ref(:,i) = c_ref(:,i)*coefs(i);
+end
+
+x0 = zeros(7,1);
+simQuad( sys, innerController, x0, T, var_ref);
 
 
 %%
@@ -160,7 +171,7 @@ pause
 A_ = [sys.A eye(7); zeros(7) eye(7)];
 B_ = [sys.B; zeros(7,4)];
 C_ = [eye(7) zeros(7)];
-p = [0.5*ones(7,1); 0.45*ones(7,1)];
+p = [0.5*ones(7,1); 0.4*ones(7,1)]; % Desired poles
 K = place(A_', C_', p);
 L = K';
 
@@ -169,43 +180,65 @@ filter.Bf = [B_ L];
 
 %% Offset free MPC
 fprintf('PART III - OFFSET FREE / Disturbance rejection...\n')
-
+yalmip('clear')
 
 % Define optimization variables
-x = sdpvar(7,1,'full');
+x_hat = sdpvar(7,1,'full');
 r = sdpvar(4,1,'full');
-dx = sdpvar(7,N,'full');
-du = sdpvar(4,N,'full');
-d = sdpvar(7,1,'full'); % Constant mean of disturbance
-u_r = zeros(4,1); % u_r is close to 0 for arbitrary references
-x_r = [r; zeros(3,1)];
+x = sdpvar(7,N,'full');
+u = sdpvar(4,N,'full');
+d_hat = sdpvar(7,1,'full'); % Constant mean of disturbance
+% u_r = zeros(4,1); % u_r is close to 0 for arbitrary references
+% x_r = [r; zeros(3,1)];
 
 % Define constraints and objective
 constraints = [];
 objective = 0;
 
+% Target condition with disturbance
+steady_state = [eye(7)-sys.A, -sys.B; C, zeros(4,4)]\[eye(7)*d_hat; r-zeros(4,7)*d_hat];
+x_r = steady_state(1:7);
+u_r = steady_state(8:11);
 % Initial condition
-constraints = constraints + (dx(:,1) == x - x_r);
+constraints = constraints + (x(:,1) == x_hat);
 for i = 1:N-1,
     % System dynamics with disturbance
-    constraints = constraints + (dx(:,i+1) + x_r == sys.A*(dx(:,i) + x_r) + sys.B*(du(:,i) + u_r) + d);   
+    constraints = constraints + (x(:,i+1)== sys.A*x(:,i) + sys.B*u(:,i) + d_hat);   
     % State constraints
-    constraints = constraints + (-zpMax <= dx(1,i) + x_r(1) <= zpMax);                    
-    constraints = constraints + (-angleMax <= dx(2:3,i) + x_r(2:3) <= angleMax);
-    constraints = constraints + (-angledMax <= dx(5:6,i) + x_r(5:6) <= angledMax);
-    constraints = constraints + (-gammadMax <= dx(7,i) + x_r(7) <= gammadMax);
+    constraints = constraints + (-zpMax <= x(1,i) <= zpMax);                    
+    constraints = constraints + (-angleMax <= x(2:3,i) <= angleMax);
+    constraints = constraints + (-angledMax <= x(5:6,i) <= angledMax);
+    constraints = constraints + (-gammadMax <= x(7,i) <= gammadMax);
     % Input constraints
-    constraints = constraints + (uMin <= du(:,i) + u_r <= uMax);                       
+    constraints = constraints + (uMin <= u(:,i) <= uMax);
     % Cost function
-    objective = objective + dx(:,i)'*Q*dx(:,i) + du(:,i)'*R*du(:,i);            
+    objective = objective + (x(:,i)-x_r)'*Q*(x(:,i)-x_r) + (u(:,i)-u_r)'*R*(u(:,i) - u_r);            
 end
-% constraints = constraints + (dx(:,N) == 0);
-objective = objective + dx(:,N)'*S*dx(:,N);     % Terminal constraint
+% constraints = constraints + (x(:,N) == x_r);
+objective = objective + (x(:,N)-x_r)'*S*(x(:,N)-x_r);     % Terminal constraint
 
-innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1); d], du(:,1));
+innerController = optimizer(constraints, objective, options, [x_hat(:,1); r(:,1); d_hat], u(:,1));
+
+%% Step reference tracking with disturbance
+close all;
+T = 20;
+ref = [-0.5 5*pi/180 -5*pi/180 90*pi/180]';
 
 simQuad(sys, innerController, x0, T, ref, filter);
 
+%% Slowly-varying tracking with disturbance
+
+T = 20;
+ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';
+coefs = linspace(0.5, 1, T/sys.Ts+1);
+c_ref = repmat(ref,1, T/sys.Ts+1);
+var_ref = zeros(4, T/sys.Ts+1);
+for i=1:T/sys.Ts+1,
+    var_ref(:,i) = c_ref(:,i)*coefs(i);
+end
+
+x0 = zeros(7,1);
+simQuad( sys, innerController, x0, T, var_ref, filter);
 
 
 %%
@@ -214,6 +247,8 @@ pause
 %% Final simulation
 fprintf('Running the FINAL NL model simulation...\n')
 sim('simulation2.mdl') 
+
+%%
 pause
 %% BONUS - Slew rate constraints
 % run after doing nonlinear simulations otherwise the NL simulations won't

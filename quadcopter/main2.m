@@ -172,26 +172,26 @@ sim('simulation1.mdl')
 
 %% Disturbance estimation
 % Estimator
-A_hat = [sys.A eye(size(sys.A,1))
+A_hat = [sys.A              eye(size(sys.A,1))
          zeros(size(sys.A)) eye(size(sys.A,1))];
 B_hat = [sys.B 
         zeros(size(sys.A,1),size(sys.B,2))];
 C_hat = [eye(7) zeros(7)];
 
 pole = [0.3 % d_yawdot
-        0.5 % x_yawdot
-        0.5 % x_pitchdot
+        0.45 % x_yawdot
+        0.45 % x_pitchdot
         0.4 % d_yaw
-        0.5 % x_yaw
+        0.45 % x_yaw
         0.45 % d_roll
         0.45 % d_ptich 
         0.45 % d_pitchdot 
         0.4 % d_zdot 
-        0.5 % x_rolldot 
+        0.45 % x_rolldot 
         0.4 % d_rolldot 
-        0.5 % x_pitch 
-        0.5 % x_roll
-        0.5 % x_zdot
+        0.4 % x_pitch 
+        0.4 % x_roll
+        0.4 % x_zdot
         ];
         
 Q = diag([10 1e3 1e3 5 1e-1 1e-1 1e-1]); 
@@ -225,11 +225,14 @@ for i = 1:Npred-1
 con = con + [dx(:,1) == xc - xr];
 %con = con + [[dx(:,i+1)+xr(:,1);d_est] == filter.Af*[dx(:,i)+xr(:,1);d_est] + filter.Bf*[du(:,i);dx(:,i+1)+xr(:,1)]]; % System dynamics xf = Af*xf + Bf*[u; x];
 con = con + [dx(:,i+1) == sys.A*dx(:,i) + sys.B*du(:,i) + d_est];
+
 con = con + [-zdotMax <= dx(1,i) + xr(1,1) <= zdotMax]; % State constraints
 con = con + [-angleMax <= dx(2:3,i) + xr(2:3,1) <= angleMax];
 con = con + [-angledotMax <= dx(5:6,i) + xr(5:6,1) <= angledotMax];
 con = con + [-yawdotMax <= dx(7,i) + xr(7,1) <= yawdotMax];
+
 con = con + [uMin <= du(:,i) <= uMax]; % Input constraints
+
 obj = obj + dx(:,i)'*Q*dx(:,i) + du(:,i)'*R*du(:,i); % Cost function
 end
 %con = con + [dx(:,Npred) == 0]; % Terminal constraint
@@ -240,9 +243,10 @@ innerController = optimizer(con, obj, option, [xc;rc;d_est], du(:,1));
 % ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-ref = [zdotr rollr pitchr yawr]'/2;
+ref = [zdotr/2 rollr/2 pitchr/2 90*pi/180]';
 simQuad( sys, innerController, x0, T, ref, filter);
 
+%%
 ref1 = ref*1.5;
 ref2 = ref/3;
 T = 15;
