@@ -37,7 +37,7 @@ uMax = ones(4,1)-us;
 [~,S,~] = dlqr(sys.A, sys.B, Q, R, zeros(7, 4));
 
 % System definition
-x = sdpvar(7,N,'full'); u = sdpvar(4,N,'full');
+x = sdpvar(7,N,'full'); u = sdpvar(4,N-1,'full');
 constraints = []; objective = 0;
 for i = 1:N-1
     % System dynamics
@@ -107,7 +107,7 @@ state = SS_ctrl{r};
 x = sdpvar(7,1,'full');
 r = sdpvar(4,1,'full');
 dx = sdpvar(7,N,'full');
-du = sdpvar(4,N,'full');
+du = sdpvar(4,N-1,'full');
 u_r = zeros(4,1); % u_r is close to 0 for arbitrary references (previous part)
 x_r = [r; zeros(3,1)];
 
@@ -186,7 +186,7 @@ yalmip('clear')
 x_hat = sdpvar(7,1,'full');
 r = sdpvar(4,1,'full');
 x = sdpvar(7,N,'full');
-u = sdpvar(4,N,'full');
+u = sdpvar(4,N-1,'full');
 d_hat = sdpvar(7,1,'full'); % Constant mean of disturbance
 % u_r = zeros(4,1); % u_r is close to 0 for arbitrary references
 % x_r = [r; zeros(3,1)];
