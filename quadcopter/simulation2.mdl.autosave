@@ -92,7 +92,7 @@ Model {
   LastModifiedBy	  "Arnaud"
   ModifiedDateFormat	  "%<Auto>"
   LastModifiedDate	  "Fri Jun 03 15:57:57 2016"
-  RTWModifiedTimeStamp	  386870141
+  RTWModifiedTimeStamp	  386870618
   ModelVersionFormat	  "1.%<AutoIncrement:196>"
   ConfigurationManager	  "none"
   SampleTimeColors	  off
@@ -1934,7 +1934,6 @@ Model {
 	  SID			  "244"
 	  Position		  [135, 285, 170, 315]
 	  ZOrder		  1
-	  SampleTime		  "6"
 	}
 	Block {
 	  BlockType		  Fcn
