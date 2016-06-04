@@ -33,13 +33,13 @@ gammadMax = 60*pi/180;      % [rad/s]
 uMin = -us;
 uMax = ones(4,1)-us;
 
-% Terminal constraint using dlqr
+% Terminal weight using dlqr
 [~,S,~] = dlqr(sys.A, sys.B, Q, R, zeros(7, 4));
 
 % System definition
-x = sdpvar(7,N,'full'); u = sdpvar(4,N-1,'full');
+x = sdpvar(7,N+1,'full'); u = sdpvar(4,N,'full');
 constraints = []; objective = 0;
-for i = 1:N-1
+for i = 1:N
     % System dynamics
     constraints = constraints + (x(:,i+1) == sys.A*x(:,i) + sys.B*u(:,i));
     % State constraints
@@ -52,11 +52,11 @@ for i = 1:N-1
     % Cost function
     objective = objective +  x(:,i)'*Q*x(:,i) + u(:,i)'*R*u(:,i);
 end
-% Terminal constraint
-objective = objective + x(:,N)'*S*x(:,N);
+% Terminal weight
+objective = objective + x(:,N+1)'*S*x(:,N+1);
 
 % Simulate the model
-T = 10;% Time horizon
+T = 10; % Simulation time
 x0 = [-1 10*pi/180 -10*pi/180 120*pi/180 0 0 0]'; % Initial state
 
 options = sdpsettings('solver','gurobi');
@@ -101,14 +101,12 @@ SS_ctrl = optimizer(constraints, objective, options, r, [x_r; u_r]);
 r = [-1 10*pi/180 -10*pi/180 120*pi/180]';
 state = SS_ctrl{r};
 
-%% --------------------------------------------------------------------------
-% MPC Tracking 
-
+%% MPC Tracking 
 % Define optimization variables
 x = sdpvar(7,1,'full');
 r = sdpvar(4,1,'full');
-dx = sdpvar(7,N,'full');
-du = sdpvar(4,N-1,'full');
+dx = sdpvar(7,N+1,'full');
+du = sdpvar(4,N,'full');
 u_r = zeros(4,1); % u_r is close to 0 for arbitrary references (previous part)
 x_r = [r; zeros(3,1)];
 
@@ -118,7 +116,7 @@ objective = 0;
 
 % Initial condition
 constraints = constraints + (dx(:,1) == x - x_r);
-for i = 1:N-1,
+for i = 1:N,
     % System dynamics
     constraints = constraints + (dx(:,i+1) == sys.A*dx(:,i) + sys.B*du(:,i));   
     % State constraints
@@ -132,8 +130,9 @@ for i = 1:N-1,
     objective = objective + dx(:,i)'*Q*dx(:,i) + du(:,i)'*R*du(:,i);            
 end
 % Terminal constraint
-objective = objective + dx(:,N)'*S*dx(:,N);     
+objective = objective + dx(:,N+1)'*S*dx(:,N+1);
 
+% Compute controller
 innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1)], du(:,1));
 
 %% Tracking of constant reference signal
@@ -142,8 +141,8 @@ x0 = zeros(7,1);
 simQuad( sys, innerController, x0, T, ref);
 
 %% Tracking of slowly varying reference signal
-T = 20;
-ref = [-0.5 5*pi/180 -5*pi/180 60*pi/180]';
+T = 20;                                     % Simulation time
+ref = [-0.5 5*pi/180 -5*pi/180 60*pi/180]'; % Final reference
 coefs = linspace(0.5, 1, T/sys.Ts+1);
 c_ref = repmat(ref,1, T/sys.Ts+1);
 var_ref = zeros(4, T/sys.Ts+1);
@@ -182,10 +181,9 @@ fprintf('PART III - OFFSET FREE / Disturbance rejection...\n')
 yalmip('clear')
 
 % Define optimization variables
-x_hat = sdpvar(7,1,'full');
 r = sdpvar(4,1,'full');
-x = sdpvar(7,N,'full');
-u = sdpvar(4,N-1,'full');
+x = sdpvar(7,N+1,'full');
+u = sdpvar(4,N,'full');
 d_est = sdpvar(7,1,'full'); % Estimate of the disturbance
 
 % Define constraints and objective
@@ -196,9 +194,8 @@ objective = 0;
 steady_state = [eye(7)-sys.A, -sys.B; C, zeros(4,4)]\[eye(7)*d_est; r-zeros(4,7)*d_est];
 x_r = steady_state(1:7);
 u_r = steady_state(8:11);
-% Initial condition
-constraints = constraints + (x(:,1) == x_hat);
-for i = 1:N-1,
+
+for i = 1:N,
     % System dynamics with disturbance
     constraints = constraints + (x(:,i+1)== sys.A*x(:,i) + sys.B*u(:,i) + d_est);   
     % State constraints
@@ -211,10 +208,11 @@ for i = 1:N-1,
     % Cost function
     objective = objective + (x(:,i)-x_r)'*Q*(x(:,i)-x_r) + (u(:,i)-u_r)'*R*(u(:,i) - u_r);            
 end
-% Terminal constraint
-objective = objective + (x(:,N)-x_r)'*S*(x(:,N)-x_r);    
+% Terminal weight
+objective = objective + (x(:,N+1)-x_r)'*S*(x(:,N+1)-x_r);    
 
-innerController = optimizer(constraints, objective, options, [x_hat(:,1); r(:,1); d_est], u(:,1));
+% Compute controller
+innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1); d_est(:,1)], u(:,1));
 
 %% Step reference tracking with disturbance
 close all;
@@ -225,8 +223,8 @@ simQuad(sys, innerController, x0, T, ref, filter);
 
 %% Slowly-varying tracking with disturbance
 
-T = 20;
-ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';
+T = 20;                                             % Simulation time
+ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';   % Final reference
 coefs = linspace(0.5, 1, T/sys.Ts+1);
 c_ref = repmat(ref,1, T/sys.Ts+1);
 var_ref = zeros(4, T/sys.Ts+1);
@@ -236,7 +234,6 @@ end
 
 x0 = zeros(7,1);
 simQuad( sys, innerController, x0, T, var_ref, filter);
-
 
 %%
 pause
@@ -253,12 +250,11 @@ pause
 % work (because of the additional controller argument)
 fprintf('BONUS - SLEW RATE CONSTRAINTS...\n')
 
-Delta = 0.05; % Maximal slew rate
+delta = 0.05; % Maximal slew rate
 
 % Define optimization variables
-x_hat = sdpvar(7,1,'full');
 r = sdpvar(4,1,'full');
-x = sdpvar(7,N,'full');
+x = sdpvar(7,N+1,'full');
 u = sdpvar(4,N,'full');
 d_est = sdpvar(7,1,'full'); % Estimate of the disturbance
 u_prev = sdpvar(4,1);       % Previous control input applied to the plant
@@ -268,14 +264,13 @@ constraints = [];
 objective = 0;
 
 % Target condition with disturbance
-steady_state = [eye(7)-sys.A, -sys.B; C, zeros(4,4)]\[eye(7)*d_est; r-zeros(4,7)*d_est];
+steady_state = [eye(7)-sys.A, -sys.B; C, zeros(4,4)]\[eye(7)*d_est; r-zeros(4,7)*d_est]; % CHECK THAT IT'S NECESSARY BY CREATING A SEPERATE CONTROLLER
 x_r = steady_state(1:7);
 u_r = steady_state(8:11);
 
 % Initial conditions
-constraints = constraints + (x(:,1) == x_hat);
-constraints = constraints + (-Delta <= u(:,1) - u_prev <= Delta);
-for i = 1:N-1,
+constraints = constraints + (-delta <= u(:,1) - u_prev <= delta);
+for i = 1:N,
     % System dynamics with disturbance
     constraints = constraints + (x(:,i+1)== sys.A*x(:,i) + sys.B*u(:,i) + d_est);   
     % State constraints
@@ -287,13 +282,16 @@ for i = 1:N-1,
     constraints = constraints + (uMin <= u(:,i) <= uMax);
     % Cost function
     objective = objective + (x(:,i)-x_r)'*Q*(x(:,i)-x_r) + (u(:,i)-u_r)'*R*(u(:,i) - u_r);            
-    % Slew rate constraint
-    constraints = constraints + (-Delta <= u(:,i+1)-u(:,i) <= Delta); 
 end
-% Terminal constraint
-objective = objective + (x(:,N)-x_r)'*S*(x(:,N)-x_r);    
+for i = 1:N-1,
+    % Slew rate constraint
+    constraints = constraints + (-delta <= u(:,i+1)-u(:,i) <= delta); 
+end
 
-innerController = optimizer(constraints, objective, options, [x_hat(:,1); r(:,1); u_prev; d_est], u(:,1));
+% Terminal weight
+objective = objective + (x(:,N+1)-x_r)'*S*(x(:,N+1)-x_r);    
+
+innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1); u_prev(:,1); d_est(:,1)], u(:,1));
 
 %% Step reference tracking with disturbance and slew rate constraints
 close all;
