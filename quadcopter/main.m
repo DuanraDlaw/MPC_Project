@@ -141,7 +141,7 @@ x0 = zeros(7,1);
 simQuad( sys, innerController, x0, T, ref);
 
 %% Tracking of slowly varying reference signal
-T = 20;                                     % Simulation time
+T = 10;                                     % Simulation time
 ref = [-0.5 5*pi/180 -5*pi/180 60*pi/180]'; % Final reference
 coefs = linspace(0.5, 1, T/sys.Ts+1);
 c_ref = repmat(ref,1, T/sys.Ts+1);
@@ -216,14 +216,14 @@ innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1); d_
 
 %% Step reference tracking with disturbance
 close all;
-T = 20;
+T = 10;
 ref = [-0.5 5*pi/180 -5*pi/180 90*pi/180]';
 
 simQuad(sys, innerController, x0, T, ref, filter);
 
 %% Slowly-varying tracking with disturbance
 
-T = 20;                                             % Simulation time
+T = 10;                                             % Simulation time
 ref = 0.5* [-1 10*pi/180 -10*pi/180 120*pi/180]';   % Final reference
 coefs = linspace(0.5, 1, T/sys.Ts+1);
 c_ref = repmat(ref,1, T/sys.Ts+1);
@@ -295,7 +295,7 @@ innerController = optimizer(constraints, objective, options, [x(:,1); r(:,1); u_
 
 %% Step reference tracking with disturbance and slew rate constraints
 close all;
-T = 20;
+T = 30;
 x0 = zeros(7,1);
 ref = [-0.5 5*pi/180 -5*pi/180 90*pi/180]';
 

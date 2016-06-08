@@ -32,7 +32,7 @@ Model {
       BusOutputAsStruct	      "off"
     }
     ParameterArgumentNames  ""
-    ComputedModelVersion    "1.196"
+    ComputedModelVersion    "1.198"
     NumModelReferences	    0
     NumTestPointedSignals   0
   }
@@ -77,11 +77,11 @@ Model {
 	$ObjectID		5
 	$ClassName		"Simulink.EditorInfo"
 	IsActive		[1]
-	ViewObjType		"SimulinkSubsys"
-	LoadSaveID		"229"
+	ViewObjType		"SimulinkTopLevel"
+	LoadSaveID		"0"
 	Extents			[924.0, 872.0]
-	ZoomFactor		[0.8]
-	Offset			[-131.60000000000002, -76.0]
+	ZoomFactor		[1.0]
+	Offset			[0.0, 0.0]
       }
     }
   }
@@ -91,9 +91,9 @@ Model {
   ModifiedByFormat	  "%<Auto>"
   LastModifiedBy	  "Arnaud"
   ModifiedDateFormat	  "%<Auto>"
-  LastModifiedDate	  "Fri Jun 03 15:57:57 2016"
-  RTWModifiedTimeStamp	  386870141
-  ModelVersionFormat	  "1.%<AutoIncrement:196>"
+  LastModifiedDate	  "Wed Jun 08 09:53:57 2016"
+  RTWModifiedTimeStamp	  387280309
+  ModelVersionFormat	  "1.%<AutoIncrement:198>"
   ConfigurationManager	  "none"
   SampleTimeColors	  off
   SampleTimeAnnotations	  off
@@ -1032,7 +1032,7 @@ Model {
   System {
     Name		    "simulation2"
     Location		    [-7, 0, 967, 1047]
-    Open		    off
+    Open		    on
     ModelBrowserVisibility  off
     ModelBrowserWidth	    200
     ScreenColor		    "white"
@@ -1829,7 +1829,7 @@ Model {
       System {
 	Name			"lemniscate"
 	Location		[-7, 0, 967, 1047]
-	Open			on
+	Open			off
 	ModelBrowserVisibility	off
 	ModelBrowserWidth	200
 	ScreenColor		"white"
@@ -1934,7 +1934,6 @@ Model {
 	  SID			  "244"
 	  Position		  [135, 285, 170, 315]
 	  ZOrder		  1
-	  SampleTime		  "6"
 	}
 	Block {
 	  BlockType		  Fcn
